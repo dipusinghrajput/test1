@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Checker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(to right, #6dd5ed, #2193b0);
+            margin: 0;
+            transition: background 3s;
+        }
+        
+        #app {
+            max-width: 450px;
+            padding: 30px;
+            background-color: #ffffff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            border-radius: 12px;
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        h2 { color: #333; }
+        .input-group { margin-bottom: 15px; }
+
+        .input-group label { font-weight: bold; color: #555; }
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+        }
+
+        .input-group input:focus { border-color: #4CAF50; }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        
+        button:hover { background-color: #45a049; }
+        
+        #loading {
+            display: none;
+            position: absolute;
+            top: 54%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        #loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #ddd;
+            border-top: 4px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        #menu, #results, #feedback { display: none; margin-top: 15px; }
+        
+        select {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 2px solid #4CAF50;
+            border-radius: 6px;
+            background-color: #f0f0f0;
+            transition: background-color 0.3s;
+        }
+        
+        select:hover { background-color: #e0f7fa; }
+
+        .feedback-item {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 6px;
+            background-color: #f9f9f9;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .bunks { color: blue; font-weight: bold; }
+        .required { color: red; font-weight: bold; }
+
+        /* Responsive Design */
+        @media (max-width: 600px) {
+            #app {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <h2>Attendance Checker</h2>
+        
+        <div id="loading">
+            <div id="loading-spinner"></div>
+           <!--<p>College ka Website slow hai, hum nai</p>-->
+        </div>
+
+        <div id="login-section">
+            <div class="input-group">
+                <label for="username">Username</label>
+                <input type="text" id="username">
+            </div>
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password">
+            </div>
+            <button id="submit-btn">Login and Check Attendance</button>
+        </div>
+
+        <div id="menu">
+            <button onclick="viewSpecificSubject()">1. View specific subject attendance</button>
+            <button onclick="viewAllSubjects()">2. View all subjects</button>
+            <button onclick="changeRequiredPercentage()">3. Change required attendance</button>
+            <button onclick="exit()">4. Exit</button>
+        </div>
+
+        <div id="results">
+            <select id="subject-dropdown" onchange="showSubjectDetails(this.value)">
+                <option value="">Select a Subject</option>
+            </select>
+        </div>
+
+        <div id="feedback"></div>
+    </div>
+
+    <script>
+        let attendanceData = {};
+        let requiredPercentage = 75;
+
+        function showLoading() {
+            document.getElementById("loading").style.display = "block";
+            document.getElementById("login-section").style.display = "none";
+        }
+
+        function hideLoading() {
+            document.getElementById("loading").style.display = "none";
+        }
+
+        document.getElementById("submit-btn").addEventListener("click", async function () {
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+            if (!username || !password) {
+                showFeedback("Please enter your username and password.", "error");
+                return;
+            }
+
+            showLoading();
+
+            try {
+                const response = await fetch("/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, password, required_percentage: parseInt(requiredPercentage) })
+                });
+
+                hideLoading();
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    showFeedback(errorData.error || 'Login failed', "error");
+                    return;
+                }
+
+                const data = await response.json();
+                attendanceData = data.attendance;
+                requiredPercentage = data.required_percentage;
+                displayMenu();
+            } catch (error) {
+                hideLoading();
+                showFeedback("An error occurred. Please try again later.", "error");
+            }
+        });
+
+        function displayMenu() {
+            document.getElementById("login-section").style.display = "none";
+            document.getElementById("menu").style.display = "block";
+            showFeedback("Attendance data loaded. Choose an option from the menu.", "success");
+        }
+
+        function showFeedback(message, type) {
+            document.getElementById("feedback").style.display = "block";
+            document.getElementById("feedback").innerHTML = `<div class="feedback-item ${type}">${message}</div>`;
+        }
+
+        function viewSpecificSubject() {
+            let subjectDropdown = document.getElementById("subject-dropdown");
+            subjectDropdown.innerHTML = `<option value="">Select a Subject</option>`;
+            for (const subject in attendanceData) {
+                subjectDropdown.innerHTML += `<option value="${subject}">${subject}</option>`;
+            }
+            document.getElementById("results").style.display = "block";
+        }
+
+        function showSubjectDetails(subjectName) {
+            const subject = attendanceData[subjectName];
+            if (!subject) return;
+            const message = subject.allowed_bunks 
+                ? `You can bunk ${subject.allowed_bunks} classes.` 
+                : `You need to attend ${subject.required_classes} more classes.`;
+            showFeedback(message, subject.allowed_bunks ? "bunks" : "required");
+        }
+
+        function viewAllSubjects() {
+            let resultHtml = "<h3>Attendance for All Subjects</h3>";
+            for (const subject in attendanceData) {
+                const subj = attendanceData[subject];
+                const message = subj.allowed_bunks 
+                    ? `<span class="bunks">Allowed Bunks: ${subj.allowed_bunks}</span>`
+                    : `<span class="required">Required Classes: ${subj.required_classes}</span>`;
+                resultHtml += `<p><strong>${subject}</strong>: ${message}</p>`;
+            }
+            showFeedback(resultHtml, "info");
+            document.getElementById("results").style.display = "none";
+        }
+
+        function changeRequiredPercentage() {
+            requiredPercentage = prompt("Enter new required attendance percentage:", requiredPercentage);
+            if (requiredPercentage !== null) {
+                requiredPercentage = parseInt(requiredPercentage);
+                fetchAttendanceData();
+            }
+        }
+
+        function exit() {
+            document.getElementById("app").innerHTML = "<p>Goodbye! Have a great day!</p>";
+        }
+    </script>
+</body>
+</html>
